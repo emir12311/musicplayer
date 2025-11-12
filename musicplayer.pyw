@@ -22,7 +22,7 @@ class PlayerWindow(QMainWindow, Player):
         self.player.setPlaylist(self.playlist)
         
         self.setupui()
-        self.load_settings()
+        self.loadsettings()
 
         self.tray = QSystemTrayIcon(QIcon("icon.ico"), parent=self)
         self.tray.setToolTip("Music Player")
@@ -62,7 +62,18 @@ class PlayerWindow(QMainWindow, Player):
         self.u.horizontalSlider.sliderMoved.connect(self.settime)
         self.u.verticalSlider.valueChanged.connect(self.volume)
 
-    def openfile(self, path=None):
+    def openfile(self):
+        if hasattr(self, "folder"):
+            del self.folder  
+        path, _ = QFileDialog.getOpenFileName(self, "Select a Music File", "", "Media Files(*.mp3)")
+        self.filepath = path
+        self.playlist.clear()
+        self.playlist.addMedia(QMediaContent(QUrl.fromLocalFile(path)))
+        self.playmedia()
+    
+    def loadfile(self, path=None):
+        if hasattr(self, "folder"):
+            del self.folder  
         if path is None:
             path, _ = QFileDialog.getOpenFileName(self, "Select a Music File", "", "Media Files(*.mp3)")
         if not path:
@@ -76,6 +87,10 @@ class PlayerWindow(QMainWindow, Player):
         self.u.verticalSlider.setValue(self.player.volume())
         self.vol = self.u.verticalSlider.value()
         self.player.setVolume(0)
+        if self.u.checkBox.isChecked():
+            self.playlist.shuffle()
+            self.playlist.setCurrentIndex(0)
+        self.player.stop()
         self.player.play()
         self.player.setVolume(self.vol)
         self.setWindowTitle(os.path.basename(self.player.currentMedia().canonicalUrl().toLocalFile()).split(os.extsep, 1)[0])
@@ -100,8 +115,12 @@ class PlayerWindow(QMainWindow, Player):
             elif self.player.state() == QMediaPlayer.PausedState:
                 self.player.play()
                 self.u.pushButton.setText("| |")
-        except:
-            pass
+            else:
+                if self.playlist.mediaCount() > 0:
+                    self.player.play()
+                    self.u.pushButton.setText("| |")
+        except Exception as e:
+            print("Error in playbutton:", e)
     def volume(self):
         value = self.u.verticalSlider.value()
         self.player.setVolume(value)
@@ -126,6 +145,170 @@ class PlayerWindow(QMainWindow, Player):
     def settime(self):
         self.player.setPosition(self.u.horizontalSlider.sliderPosition())
 
+    def showphoto(self):
+        self.u.label_4.hide()
+        if self.u.actionShow_Photo.isChecked():
+            self.currentmedia = self.player.currentMedia().canonicalUrl().toLocalFile()
+            if not self.currentmedia or not os.path.isfile(self.currentmedia):
+                return
+            self.currentmediaload = eyed3.load(self.currentmedia)
+            if self.currentmediaload and self.currentmediaload.tag and self.currentmediaload.tag.images:
+                img_data = self.currentmediaload.tag.images[0].image_data
+                pixmap = QPixmap()
+                if pixmap.loadFromData(img_data):
+                    scaled_pixmap = pixmap.scaled(self.u.label_4.size(),aspectRatioMode=1,transformMode=1)
+                    self.u.label_4.setPixmap(scaled_pixmap)
+                    self.u.label_4.show()
+            else:
+                self.u.label_4.hide()
+        else:
+            self.u.label_4.hide()
+    
+    def updatemedia(self):
+        self.u.label_4.hide()
+        self.currentmedia = self.player.currentMedia().canonicalUrl().toLocalFile()
+        self.setWindowTitle(os.path.basename(self.player.currentMedia().canonicalUrl().toLocalFile()).split(os.extsep, 1)[0])
+        if self.u.actionShow_Photo.isChecked():
+            if not self.currentmedia or not os.path.isfile(self.currentmedia):
+                return
+            self.currentmediaload = eyed3.load(self.currentmedia)
+            if self.currentmediaload and self.currentmediaload.tag and self.currentmediaload.tag.images:
+                img_data = self.currentmediaload.tag.images[0].image_data
+                pixmap = QPixmap()
+                if pixmap.loadFromData(img_data):
+                    scaled_pixmap = pixmap.scaled(self.u.label_4.size(),aspectRatioMode=1,transformMode=1)
+                    self.u.label_4.setPixmap(scaled_pixmap)
+                    self.u.label_4.show()
+            else:
+                self.u.label_4.hide()
+    
+    def repeatcheck(self):
+        if self.u.checkBox_2.checkState() == Qt.Unchecked:
+            self.playlist.setPlaybackMode(QMediaPlaylist.Sequential)
+            if self.u.actionLight.isChecked():
+                self.u.checkBox_2.setStyleSheet("QCheckBox::indicator { background-color: #ffffff; border: 1px solid #888888; }")
+            else:
+                self.u.checkBox_2.setStyleSheet("QCheckBox::indicator { border: 1px solid #888; }")
+        elif self.u.checkBox_2.checkState() == Qt.PartiallyChecked:
+            self.playlist.setPlaybackMode(QMediaPlaylist.Loop)
+            if self.u.actionLight.isChecked():
+                self.u.checkBox_2.setStyleSheet("QCheckBox::indicator { background-color: #bbbbbb; border: 1px solid #888888; }")
+            else:
+                self.u.checkBox_2.setStyleSheet("QCheckBox::indicator { background-color: #525050; border: 1px solid #525050; }")
+        elif self.u.checkBox_2.checkState() == Qt.Checked:
+            self.playlist.setPlaybackMode(QMediaPlaylist.CurrentItemInLoop)
+            if self.u.actionLight.isChecked():
+
+                self.u.checkBox_2.setStyleSheet("QCheckBox::indicator { background-color: #888888; border: 1px solid #888888; }")
+            else:
+                self.u.checkBox_2.setStyleSheet("QCheckBox::indicator { background-color: #2b2b2b; border: 1px solid #2b2b2b; }")
+
+    def shuffle(self):
+        if self.u.checkBox.isChecked():
+            self.playlist.shuffle()
+
+    def r0_5x(self):
+        self.player.setPlaybackRate(0.5)
+        for option in [self.u.action1x, self.u.action1_5x, self.u.action2x]:
+            if option.isChecked():
+                option.setChecked(False)
+    
+    def r1x(self):
+        self.player.setPlaybackRate(1.0)
+        for option in [self.u.action0_5x, self.u.action1_5x, self.u.action2x]:
+            if option.isChecked():
+                option.setChecked(False)
+
+    def r1_5x(self):
+        self.player.setPlaybackRate(1.5)
+        for option in [self.u.action1x, self.u.action0_5x, self.u.action2x]:
+            if option.isChecked():
+                option.setChecked(False)
+
+    def r2x(self):
+        self.player.setPlaybackRate(2.0)
+        for option in [self.u.action1x, self.u.action1_5x, self.u.action0_5x]:
+            if option.isChecked():
+                option.setChecked(False)
+    
+    def savesettings(self):
+        if self.playlist.mediaCount() > 1:
+            last_path = os.path.dirname(self.playlist.media(0).canonicalUrl().toLocalFile())
+        elif self.playlist.mediaCount() == 1:
+            last_path = self.playlist.media(0).canonicalUrl().toLocalFile()
+        else:
+            last_path = ""
+
+        settings = {
+            "last_playlist_path": last_path,
+            "last_track": self.player.currentMedia().canonicalUrl().toLocalFile() if self.player.currentMedia() else "",
+            "volume": self.player.volume(),
+            "repeat_mode": self.u.checkBox_2.checkState(),
+            "shuffle": self.u.checkBox.isChecked(),
+            "theme": "dark" if self.u.actionDark.isChecked() else "light",
+            "show_photo": self.u.actionShow_Photo.isChecked(),
+            "playback_rate": self.player.playbackRate(),
+        }
+        with open(self.SETTINGSFILE, "w") as f:
+            json.dump(settings, f, indent=4)
+
+    def loadsettings(self):
+        if not os.path.exists(self.SETTINGSFILE):
+            return
+        with open(self.SETTINGSFILE, "r") as f:
+            settings = json.load(f)
+
+
+        self.player.setVolume(settings.get("volume", 100))
+        self.u.verticalSlider.setValue(self.player.volume())
+
+
+        if settings.get("theme") == "dark":
+            self.u.actionDark.setChecked(True)
+            self.dark()
+        else:
+            self.u.actionLight.setChecked(True)
+            self.light()
+
+
+        self.u.checkBox_2.setCheckState(settings.get("repeat_mode", Qt.Unchecked))
+        self.u.checkBox.setChecked(settings.get("shuffle", False))
+        self.repeatcheck()
+        self.shuffle()
+
+
+        last_path = settings.get("last_playlist_path", "")
+        if last_path:
+            if os.path.isdir(last_path):
+                self.loadfolder(last_path)
+            elif os.path.isfile(last_path):
+                self.openfile(last_path)
+
+        last_track = settings.get("last_track", "")
+        if last_track:
+            for i in range(self.playlist.mediaCount()):
+                if self.playlist.media(i).canonicalUrl().toLocalFile() == last_track:
+                    self.playlist.setCurrentIndex(i)
+                    break
+            self.player.setPosition(0)
+            self.u.pushButton.setText("|>")
+
+        rate = settings.get("playback_rate", 1.0)
+        self.player.setPlaybackRate(rate)
+
+    def loadfolder(self, folder_path):
+        self.playlist.clear()
+        for filename in os.listdir(folder_path):
+            if filename.endswith(".mp3"):
+                path = os.path.join(folder_path, filename)
+                self.playlist.addMedia(QMediaContent(QUrl.fromLocalFile(path)))
+        if self.playlist.mediaCount() > 0:
+            self.playlist.setCurrentIndex(0)
+
+    def closeEvent(self, event):
+        self.savesettings()
+        super().closeEvent(event)
+    
     def dark(self):
         if self.u.actionDark.isChecked():    
             QApplication.instance().setStyleSheet("""
@@ -233,163 +416,6 @@ class PlayerWindow(QMainWindow, Player):
             if self.u.actionDark.isChecked():
                 self.u.actionDark.setChecked(False)
                 self.repeatcheck()
-    def showphoto(self):
-        self.u.label_4.hide()
-        if self.u.actionShow_Photo.isChecked():
-            self.currentmedia = self.player.currentMedia().canonicalUrl().toLocalFile()
-            if not self.currentmedia or not os.path.isfile(self.currentmedia):
-                return
-            self.currentmediaload = eyed3.load(self.currentmedia)
-            if self.currentmediaload and self.currentmediaload.tag and self.currentmediaload.tag.images:
-                img_data = self.currentmediaload.tag.images[0].image_data
-                pixmap = QPixmap()
-                if pixmap.loadFromData(img_data):
-                    scaled_pixmap = pixmap.scaled(self.u.label_4.size(),aspectRatioMode=1,transformMode=1)
-                    self.u.label_4.setPixmap(scaled_pixmap)
-                    self.u.label_4.show()
-            else:
-                self.u.label_4.hide()
-        else:
-            self.u.label_4.hide()
-    
-    def updatemedia(self):
-        self.u.label_4.hide()
-        self.currentmedia = self.player.currentMedia().canonicalUrl().toLocalFile()
-        self.setWindowTitle(os.path.basename(self.player.currentMedia().canonicalUrl().toLocalFile()).split(os.extsep, 1)[0])
-        if self.u.actionShow_Photo.isChecked():
-            if not self.currentmedia or not os.path.isfile(self.currentmedia):
-                return
-            self.currentmediaload = eyed3.load(self.currentmedia)
-            if self.currentmediaload and self.currentmediaload.tag and self.currentmediaload.tag.images:
-                img_data = self.currentmediaload.tag.images[0].image_data
-                pixmap = QPixmap()
-                if pixmap.loadFromData(img_data):
-                    scaled_pixmap = pixmap.scaled(self.u.label_4.size(),aspectRatioMode=1,transformMode=1)
-                    self.u.label_4.setPixmap(scaled_pixmap)
-                    self.u.label_4.show()
-            else:
-                self.u.label_4.hide()
-    
-    def repeatcheck(self):
-        if self.u.checkBox_2.checkState() == Qt.Unchecked:
-            self.playlist.setPlaybackMode(QMediaPlaylist.Sequential)
-            if self.u.actionLight.isChecked():
-                self.u.checkBox_2.setStyleSheet("QCheckBox::indicator { background-color: #ffffff; border: 1px solid #888888; }")
-            else:
-                self.u.checkBox_2.setStyleSheet("QCheckBox::indicator { border: 1px solid #888; }")
-        elif self.u.checkBox_2.checkState() == Qt.PartiallyChecked:
-            self.playlist.setPlaybackMode(QMediaPlaylist.Loop)
-            if self.u.actionLight.isChecked():
-                self.u.checkBox_2.setStyleSheet("QCheckBox::indicator { background-color: #bbbbbb; border: 1px solid #888888; }")
-            else:
-                self.u.checkBox_2.setStyleSheet("QCheckBox::indicator { background-color: #525050; border: 1px solid #525050; }")
-        elif self.u.checkBox_2.checkState() == Qt.Checked:
-            self.playlist.setPlaybackMode(QMediaPlaylist.CurrentItemInLoop)
-            if self.u.actionLight.isChecked():
-
-                self.u.checkBox_2.setStyleSheet("QCheckBox::indicator { background-color: #888888; border: 1px solid #888888; }")
-            else:
-                self.u.checkBox_2.setStyleSheet("QCheckBox::indicator { background-color: #2b2b2b; border: 1px solid #2b2b2b; }")
-
-    def shuffle(self):
-        if self.u.checkBox.isChecked():
-            self.playlist.shuffle()
-
-    def r0_5x(self):
-        self.player.setPlaybackRate(0.5)
-        for option in [self.u.action1x, self.u.action1_5x, self.u.action2x]:
-            if option.isChecked():
-                option.setChecked(False)
-    
-    def r1x(self):
-        self.player.setPlaybackRate(1.0)
-        for option in [self.u.action0_5x, self.u.action1_5x, self.u.action2x]:
-            if option.isChecked():
-                option.setChecked(False)
-
-    def r1_5x(self):
-        self.player.setPlaybackRate(1.5)
-        for option in [self.u.action1x, self.u.action0_5x, self.u.action2x]:
-            if option.isChecked():
-                option.setChecked(False)
-
-    def r2x(self):
-        self.player.setPlaybackRate(2.0)
-        for option in [self.u.action1x, self.u.action1_5x, self.u.action0_5x]:
-            if option.isChecked():
-                option.setChecked(False)
-    
-    def save_settings(self):
-        settings = {
-            "last_playlist_path": getattr(self, "folder", getattr(self, "filepath", "")),
-            "last_track": self.player.currentMedia().canonicalUrl().toLocalFile() if self.player.currentMedia() else "",
-            "volume": self.player.volume(),
-            "repeat_mode": self.u.checkBox_2.checkState(),
-            "shuffle": self.u.checkBox.isChecked(),
-            "theme": "dark" if self.u.actionDark.isChecked() else "light",
-            "show_photo": self.u.actionShow_Photo.isChecked(),
-            "playback_rate": self.player.playbackRate(),
-        }
-        with open(self.SETTINGSFILE, "w") as f:
-            json.dump(settings, f, indent=4)
-
-    def load_settings(self):
-        if not os.path.exists(self.SETTINGSFILE):
-            return
-        with open(self.SETTINGSFILE, "r") as f:
-            settings = json.load(f)
-
-
-        self.player.setVolume(settings.get("volume", 100))
-        self.u.verticalSlider.setValue(self.player.volume())
-
-
-        if settings.get("theme") == "dark":
-            self.u.actionDark.setChecked(True)
-            self.dark()
-        else:
-            self.u.actionLight.setChecked(True)
-            self.light()
-
-
-        self.u.checkBox_2.setCheckState(settings.get("repeat_mode", Qt.Unchecked))
-        self.u.checkBox.setChecked(settings.get("shuffle", False))
-        self.repeatcheck()
-        self.shuffle()
-
-
-        last_path = settings.get("last_playlist_path", "")
-        if last_path:
-            if os.path.isdir(last_path):
-                self.load_folder(last_path)
-            elif os.path.isfile(last_path):
-                self.openfile(last_path)
-
-        last_track = settings.get("last_track", "")
-        if last_track:
-            for i in range(self.playlist.mediaCount()):
-                if self.playlist.media(i).canonicalUrl().toLocalFile() == last_track:
-                    self.playlist.setCurrentIndex(i)
-                    break
-
-        rate = settings.get("playback_rate", 1.0)
-        self.player.setPlaybackRate(rate)
-
-    def load_folder(self, folder_path):
-        if not os.path.isdir(folder_path):
-            return
-        self.folder = folder_path
-        self.playlist.clear()
-        for filename in os.listdir(self.folder):
-            if filename.endswith(".mp3"):
-                path = os.path.join(self.folder, filename)
-                self.playlist.addMedia(QMediaContent(QUrl.fromLocalFile(path)))
-        self.playlist.setCurrentIndex(0)
-        self.playmedia()
-
-    def closeEvent(self, event):
-        self.save_settings()
-        super().closeEvent(event)
 
                 
 
