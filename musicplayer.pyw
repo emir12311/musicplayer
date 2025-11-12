@@ -23,21 +23,30 @@ class PlayerWindow(QMainWindow, Player):
         
         self.setupui()
         self.loadsettings()
-
-        self.tray = QSystemTrayIcon(QIcon("icon.ico"), parent=self)
+        
+        self.tray = QSystemTrayIcon(self)
+        self.tray.setIcon(QIcon("icon.ico"))
         self.tray.setToolTip("Music Player")
-        tray_menu = QMenu()
-        show_action = QAction("Show Player")
-        quit_action = QAction("Quit")
-        show_action.triggered.connect(self.show)
-        quit_action.triggered.connect(QApplication.instance().quit)
+
+        tray_menu = QMenu(self)
+
+        show_action = QAction("Show Player", self)
+        quit_action = QAction("Quit", self)
+
+        show_action.triggered.connect(self.showNormal)
+        quit_action.triggered.connect(QApplication.quit)
+
         tray_menu.addAction(show_action)
+        tray_menu.addSeparator()
         tray_menu.addAction(quit_action)
+
         self.tray.setContextMenu(tray_menu)
+        
+        self.tray.setVisible(True)
         self.tray.show()
 
         if start_minimized:
-            QTimer.singleShot(0, self.showMinimized)
+            QTimer.singleShot(5, self.showMinimized)
     
     def setupui(self):
         self.player.setVolume(100)
@@ -282,7 +291,7 @@ class PlayerWindow(QMainWindow, Player):
             if os.path.isdir(last_path):
                 self.loadfolder(last_path)
             elif os.path.isfile(last_path):
-                self.openfile(last_path)
+                self.loadfile(last_path)
 
         last_track = settings.get("last_track", "")
         if last_track:
