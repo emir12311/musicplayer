@@ -327,7 +327,7 @@ class PlayerWindow(QMainWindow, Player):
         if self.playlist.mediaCount() > 0:
             self.playlist.setCurrentIndex(0)
 
-    def handle_player_error(self, error):
+    def handleplayererror(self, error):
         errors = {
             QMediaPlayer.NoError: "No error",
             QMediaPlayer.ResourceError: "File missing or corrupt",
