@@ -5,8 +5,6 @@ from PyQt5.QtCore import QUrl, Qt, QTimer
 from player_ui import Player
 import sys,eyed3,os,json,ctypes
 
-# for the eyed3 errors i didnt know what errors eyed3 could give so i used all exceptions.
-
 class PlayerWindow(QMainWindow, Player):
     def __init__(self, start_minimized=False):
         super().__init__()
@@ -160,18 +158,15 @@ class PlayerWindow(QMainWindow, Player):
         if self.u.actionShow_Photo.isChecked():
             self.currentmedia = self.player.currentMedia().canonicalUrl().toLocalFile()
             if not self.currentmedia or not os.path.isfile(self.currentmedia):
-                return
-            try:    
-                self.currentmediaload = eyed3.load(self.currentmedia)
-                if self.currentmediaload and self.currentmediaload.tag and self.currentmediaload.tag.images:
-                    img_data = self.currentmediaload.tag.images[0].image_data
-                    pixmap = QPixmap()
-                    if pixmap.loadFromData(img_data):
-                        scaled_pixmap = pixmap.scaled(self.u.label_4.size(),aspectRatioMode=1,transformMode=1)
-                        self.u.label_4.setPixmap(scaled_pixmap)
-                        self.u.label_4.show()
-            except Exception as e: #Line 8
-                print(f"Loading album art error: {e}")
+                return  
+            self.currentmediaload = eyed3.load(self.currentmedia)
+            if self.currentmediaload and self.currentmediaload.tag and self.currentmediaload.tag.images:
+                img_data = self.currentmediaload.tag.images[0].image_data
+                pixmap = QPixmap()
+                if pixmap.loadFromData(img_data):
+                    scaled_pixmap = pixmap.scaled(self.u.label_4.size(),aspectRatioMode=1,transformMode=1)
+                    self.u.label_4.setPixmap(scaled_pixmap)
+                    self.u.label_4.show()
             else:
                 self.u.label_4.hide()
         else:
@@ -183,18 +178,15 @@ class PlayerWindow(QMainWindow, Player):
         self.setWindowTitle(os.path.basename(self.player.currentMedia().canonicalUrl().toLocalFile()).split(os.extsep, 1)[0])
         if self.u.actionShow_Photo.isChecked():
             if not self.currentmedia or not os.path.isfile(self.currentmedia):
-                return
-            try:    
-                self.currentmediaload = eyed3.load(self.currentmedia)
-                if self.currentmediaload and self.currentmediaload.tag and self.currentmediaload.tag.images:
-                    img_data = self.currentmediaload.tag.images[0].image_data
-                    pixmap = QPixmap()
-                    if pixmap.loadFromData(img_data):
-                        scaled_pixmap = pixmap.scaled(self.u.label_4.size(),aspectRatioMode=1,transformMode=1)
-                        self.u.label_4.setPixmap(scaled_pixmap)
-                        self.u.label_4.show()
-            except Exception as e: #Line 8
-                print(f"Loading album art error: {e}")
+                return   
+            self.currentmediaload = eyed3.load(self.currentmedia)
+            if self.currentmediaload and self.currentmediaload.tag and self.currentmediaload.tag.images:
+                img_data = self.currentmediaload.tag.images[0].image_data
+                pixmap = QPixmap()
+                if pixmap.loadFromData(img_data):
+                    scaled_pixmap = pixmap.scaled(self.u.label_4.size(),aspectRatioMode=1,transformMode=1)
+                    self.u.label_4.setPixmap(scaled_pixmap)
+                    self.u.label_4.show()
             else:
                 self.u.label_4.hide()
     
