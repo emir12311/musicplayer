@@ -24,7 +24,7 @@ After seeing the Spotify payment hit my card, I decided to build a **fully-featu
 ## Dependencies  
 Install missing libraries using:
 ```bash
-pip install pyqt5, eyed3
+pip install pyqt5, eyed3, mutagen
 ```
 
 ## Files  
