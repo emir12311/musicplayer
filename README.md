@@ -31,6 +31,7 @@ pip install -r requirements.txt
 - `player_ui.py` → UI logic created with Qt Designer.
 - `musicplayer.pyw` → Main application code.
 - `icon.ico` → Window and system tray icon made by me!
+- `requirements.txt` → The required packages for the code to work.
 
 ## Note 📝  
 Unlike some of my older projects, I’m **actively planning to use this one**, so expect occasional updates and bugfixes.  
