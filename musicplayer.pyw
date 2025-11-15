@@ -5,12 +5,15 @@ from PyQt5.QtCore import QUrl, Qt, QTimer
 from player_ui import Player
 import sys,eyed3,os,json,ctypes
 
+# for the eyed3 errors i didnt know what errors eyed3 could give so i used all exceptions.
+
 class PlayerWindow(QMainWindow, Player):
     def __init__(self, start_minimized=False):
         super().__init__()
         self.u = Player()
         self.u.setupUi(self)
         self.setWindowIcon(QIcon("icon.ico"))
+        self.dark()
         if sys.platform == "win32":
             myappid = "com.emir.musicplayer"
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
@@ -70,6 +73,7 @@ class PlayerWindow(QMainWindow, Player):
         self.player.positionChanged.connect(self.updatetime)
         self.u.horizontalSlider.sliderMoved.connect(self.settime)
         self.u.verticalSlider.valueChanged.connect(self.volume)
+        self.player.error.connect(self.handleplayererror)
 
     def openfile(self):
         if hasattr(self, "folder"):
@@ -117,19 +121,16 @@ class PlayerWindow(QMainWindow, Player):
         self.playmedia()
     
     def playbutton(self):
-        try:
-            if self.player.state() == QMediaPlayer.PlayingState:
-                self.player.pause()
-                self.u.pushButton.setText("|>")
-            elif self.player.state() == QMediaPlayer.PausedState:
+        if self.player.state() == QMediaPlayer.PlayingState:
+            self.player.pause()
+            self.u.pushButton.setText("|>")
+        elif self.player.state() == QMediaPlayer.PausedState:
+            self.player.play()
+            self.u.pushButton.setText("| |")
+        else:
+            if self.playlist.mediaCount() > 0:
                 self.player.play()
                 self.u.pushButton.setText("| |")
-            else:
-                if self.playlist.mediaCount() > 0:
-                    self.player.play()
-                    self.u.pushButton.setText("| |")
-        except Exception as e:
-            print("Error in playbutton:", e)
     def volume(self):
         value = self.u.verticalSlider.value()
         self.player.setVolume(value)
@@ -160,14 +161,17 @@ class PlayerWindow(QMainWindow, Player):
             self.currentmedia = self.player.currentMedia().canonicalUrl().toLocalFile()
             if not self.currentmedia or not os.path.isfile(self.currentmedia):
                 return
-            self.currentmediaload = eyed3.load(self.currentmedia)
-            if self.currentmediaload and self.currentmediaload.tag and self.currentmediaload.tag.images:
-                img_data = self.currentmediaload.tag.images[0].image_data
-                pixmap = QPixmap()
-                if pixmap.loadFromData(img_data):
-                    scaled_pixmap = pixmap.scaled(self.u.label_4.size(),aspectRatioMode=1,transformMode=1)
-                    self.u.label_4.setPixmap(scaled_pixmap)
-                    self.u.label_4.show()
+            try:    
+                self.currentmediaload = eyed3.load(self.currentmedia)
+                if self.currentmediaload and self.currentmediaload.tag and self.currentmediaload.tag.images:
+                    img_data = self.currentmediaload.tag.images[0].image_data
+                    pixmap = QPixmap()
+                    if pixmap.loadFromData(img_data):
+                        scaled_pixmap = pixmap.scaled(self.u.label_4.size(),aspectRatioMode=1,transformMode=1)
+                        self.u.label_4.setPixmap(scaled_pixmap)
+                        self.u.label_4.show()
+            except Exception as e: #Line 8
+                print(f"Loading album art error: {e}")
             else:
                 self.u.label_4.hide()
         else:
@@ -180,14 +184,17 @@ class PlayerWindow(QMainWindow, Player):
         if self.u.actionShow_Photo.isChecked():
             if not self.currentmedia or not os.path.isfile(self.currentmedia):
                 return
-            self.currentmediaload = eyed3.load(self.currentmedia)
-            if self.currentmediaload and self.currentmediaload.tag and self.currentmediaload.tag.images:
-                img_data = self.currentmediaload.tag.images[0].image_data
-                pixmap = QPixmap()
-                if pixmap.loadFromData(img_data):
-                    scaled_pixmap = pixmap.scaled(self.u.label_4.size(),aspectRatioMode=1,transformMode=1)
-                    self.u.label_4.setPixmap(scaled_pixmap)
-                    self.u.label_4.show()
+            try:    
+                self.currentmediaload = eyed3.load(self.currentmedia)
+                if self.currentmediaload and self.currentmediaload.tag and self.currentmediaload.tag.images:
+                    img_data = self.currentmediaload.tag.images[0].image_data
+                    pixmap = QPixmap()
+                    if pixmap.loadFromData(img_data):
+                        scaled_pixmap = pixmap.scaled(self.u.label_4.size(),aspectRatioMode=1,transformMode=1)
+                        self.u.label_4.setPixmap(scaled_pixmap)
+                        self.u.label_4.show()
+            except Exception as e: #Line 8
+                print(f"Loading album art error: {e}")
             else:
                 self.u.label_4.hide()
     
@@ -258,15 +265,21 @@ class PlayerWindow(QMainWindow, Player):
             "show_photo": self.u.actionShow_Photo.isChecked(),
             "playback_rate": self.player.playbackRate(),
         }
-        with open(self.SETTINGSFILE, "w") as f:
-            json.dump(settings, f, indent=4)
+        try:    
+            with open(self.SETTINGSFILE, "w") as f:
+                json.dump(settings, f, indent=4)
+        except(PermissionError, OSError) as e:
+            print(f"Failed to save settings: {e}")
 
     def loadsettings(self):
         if not os.path.exists(self.SETTINGSFILE):
             return
-        with open(self.SETTINGSFILE, "r") as f:
-            settings = json.load(f)
-
+        try:    
+            with open(self.SETTINGSFILE, "r") as f:
+                settings = json.load(f)
+        except(FileNotFoundError, json.JSONDecodeError, PermissionError, OSError) as e:
+            print(f"Failed to load settings: {e}")
+            return
 
         self.player.setVolume(settings.get("volume", 100))
         self.u.verticalSlider.setValue(self.player.volume())
@@ -313,6 +326,18 @@ class PlayerWindow(QMainWindow, Player):
                 self.playlist.addMedia(QMediaContent(QUrl.fromLocalFile(path)))
         if self.playlist.mediaCount() > 0:
             self.playlist.setCurrentIndex(0)
+
+    def handle_player_error(self, error):
+        errors = {
+            QMediaPlayer.NoError: "No error",
+            QMediaPlayer.ResourceError: "File missing or corrupt",
+            QMediaPlayer.FormatError: "File format not supported",
+            QMediaPlayer.AccessDeniedError: "Access denied",
+            QMediaPlayer.ServiceMissingError: "Audio system missing",
+        }
+        msg = errors.get(error)
+        print(f"Player error: {msg}")
+        self.u.pushButton.setText("|>")
 
     def closeEvent(self, event):
         self.savesettings()
@@ -426,57 +451,8 @@ class PlayerWindow(QMainWindow, Player):
                 self.u.actionDark.setChecked(False)
                 self.repeatcheck()
 
-                
-
 app = QApplication(sys.argv)
 app.setWindowIcon(QIcon("icon.ico"))
-app.setStyleSheet("""
-QMainWindow, QWidget {
-    background-color: #121212;
-    color: #eeeeee;
-}
-
-QMenuBar {
-    background-color: #181818;
-    color: #ffffff;
-    border-bottom: 1px solid #2a2a2a;
-}
-QMenuBar::item:selected { background-color: #252525; }
-QMenu { background-color: #1c1c1c; color: #ffffff; border: 1px solid #2a2a2a; }
-QStatusBar { background-color: #181818; color: #aaaaaa; border-top: 1px solid #2a2a2a; }
-
-QPushButton {
-    background-color: #1e1e1e;
-    color: #ffffff;
-    border: 1px solid #333;
-    border-radius: 5px;
-    padding: 5px;
-}
-QPushButton:hover { background-color: #2b2b2b; }
-
-QLabel { color: #cccccc; }
-
-QSlider::groove:horizontal { background: #333; height: 6px; border-radius: 3px; }
-QSlider::handle:horizontal { background: #888; width: 12px; border-radius: 6px; }
-QSlider::groove:vertical { background: #333; width: 6px; border-radius: 3px; }
-QSlider::handle:vertical { background: #888; height: 12px; border-radius: 6px; }
-
-QCheckBox { color: #cccccc; }
-QCheckBox {
-    color: #cccccc;
-}
-
-QCheckBox::indicator {
-    width: 15px;
-    height: 15px;
-    border: 1px solid #888;
-}
-
-QCheckBox::indicator:checked {
-    border: 1px solid #2b2b2b;
-    background-color: #2b2b2b;
-}
-""")
 start_minimized = "--minimized" in sys.argv
 window = PlayerWindow(start_minimized=start_minimized)
 window.show() if not start_minimized else None
