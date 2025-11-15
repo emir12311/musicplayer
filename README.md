@@ -29,8 +29,7 @@ pip install pyqt5, eyed3
 
 ## Files  
 - `player_ui.py` → UI logic created with Qt Designer.
-- `player.py` → Main application code.
-- `player_settings.json` → Generated automatically to save settings.
+- `musicplayer.pyw` → Main application code.
 - `icon.ico` → Window and system tray icon made by me!
 
 ## Note 📝  
