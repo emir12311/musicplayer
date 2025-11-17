@@ -4,7 +4,9 @@ from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent, QMediaPlaylist
 from PyQt5.QtCore import QUrl, Qt, QTimer
 from player_ui import Player
 from mutagen.flac import FLAC
-import sys,eyed3,os,json,ctypes
+from mutagen.oggopus import OggOpus
+from base64 import b64decode
+import sys,eyed3,os,json,ctypes,subprocess,zlib
 
 class PlayerWindow(QMainWindow, Player):
     def __init__(self, start_minimized=False):
@@ -16,7 +18,6 @@ class PlayerWindow(QMainWindow, Player):
         if sys.platform == "win32":
             myappid = "com.emir.musicplayer"
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-        self.u.label_4.hide()
         self.currentmediaload = None
         self.SETTINGSFILE = "player_settings.json"
         self.player = QMediaPlayer()
@@ -77,7 +78,7 @@ class PlayerWindow(QMainWindow, Player):
     def openfile(self):
         if hasattr(self, "folder"):
             del self.folder  
-        path, _ = QFileDialog.getOpenFileName(self, "Select a Music File", "", "Media Files(*.mp3 , *.flac)")
+        path, _ = QFileDialog.getOpenFileName(self, "Select a Music File", "", "Media Files(*.mp3 , *.flac , *.opus)")
         self.filepath = path
         self.playlist.clear()
         self.playlist.addMedia(QMediaContent(QUrl.fromLocalFile(path)))
@@ -87,13 +88,12 @@ class PlayerWindow(QMainWindow, Player):
         if hasattr(self, "folder"):
             del self.folder  
         if path is None:
-            path, _ = QFileDialog.getOpenFileName(self, "Select a Music File", "", "Media Files(*.mp3 , *.flac)")
+            path, _ = QFileDialog.getOpenFileName(self, "Select a Music File", "", "Media Files(*.mp3 , *.flac , *.opus)")
         if not path:
             return
         self.filepath = path
         self.playlist.clear()
         self.playlist.addMedia(QMediaContent(QUrl.fromLocalFile(path)))
-        self.playmedia()
 
     def playmedia(self):
         self.u.verticalSlider.setValue(self.player.volume())
@@ -113,7 +113,7 @@ class PlayerWindow(QMainWindow, Player):
         if self.folder:
             self.playlist.clear()
             for filename in os.listdir(self.folder):
-                if filename.endswith(".mp3") or filename.endswith(".flac"):
+                if filename.endswith(".mp3") or filename.endswith(".flac") or filename.endswith(".opus"):
                     path = os.path.join(self.folder, filename)
                     self.playlist.addMedia(QMediaContent(QUrl.fromLocalFile(path)))
             self.playlist.setCurrentIndex(0)
@@ -130,6 +130,7 @@ class PlayerWindow(QMainWindow, Player):
             if self.playlist.mediaCount() > 0:
                 self.player.play()
                 self.u.pushButton.setText("| |")
+    
     def volume(self):
         value = self.u.verticalSlider.value()
         self.player.setVolume(value)
@@ -155,35 +156,29 @@ class PlayerWindow(QMainWindow, Player):
         self.player.setPosition(self.u.horizontalSlider.sliderPosition())
 
     def showphoto(self):
-        self.u.label_4.hide()
-        if self.u.actionShow_Photo.isChecked():
-            self.currentmedia = self.player.currentMedia().canonicalUrl().toLocalFile()
-            if not self.currentmedia or not os.path.isfile(self.currentmedia):
-                return  
+        if self.u.actionShow_Photo.isChecked(): 
             if self.currentmedia.endswith(".mp3"):
                 self.currentmediaload = eyed3.load(self.currentmedia)
                 if self.currentmediaload and self.currentmediaload.tag and self.currentmediaload.tag.images:
                     img_data = self.currentmediaload.tag.images[0].image_data
-                    pixmap = QPixmap()
-                    if pixmap.loadFromData(img_data):
-                        scaled_pixmap = pixmap.scaled(self.u.label_4.size(),aspectRatioMode=1,transformMode=1)
-                        self.u.label_4.setPixmap(scaled_pixmap)
-                        self.u.label_4.show()
             elif self.currentmedia.endswith(".flac"):
                 self.currentmediaload = FLAC(self.currentmedia)
                 img_data = self.currentmediaload.pictures[0].data
-                pixmap = QPixmap()
-                if pixmap.loadFromData(img_data):
-                    scaled_pixmap = pixmap.scaled(self.u.label_4.size(),aspectRatioMode=1,transformMode=1)
-                    self.u.label_4.setPixmap(scaled_pixmap)
-                    self.u.label_4.show()
-            else:
-                self.u.label_4.hide()
-        else:
-            self.u.label_4.hide()
+            elif self.currentmedia.endswith(".opus"):
+                cover_path = os.path.join(os.path.dirname(self.currentmedia), "cover_temp.jpg")
+                cmd = ["ffmpeg", "-y", "-i", self.currentmedia, "-an", "-vcodec", "copy", cover_path]
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if os.path.isfile(cover_path):
+                    with open(cover_path, "rb") as f:
+                        img_data = f.read()
+                    os.remove(cover_path)
+            pixmap = QPixmap()
+            if pixmap.loadFromData(img_data):
+                scaled_pixmap = pixmap.scaled(self.u.label_4.size(),aspectRatioMode=1,transformMode=1)
+                self.u.label_4.setAlignment(Qt.AlignCenter)
+                self.u.label_4.setPixmap(scaled_pixmap)
     
     def updatemedia(self):
-        self.u.label_4.hide()
         self.currentmedia = self.player.currentMedia().canonicalUrl().toLocalFile()
         self.setWindowTitle(os.path.basename(self.player.currentMedia().canonicalUrl().toLocalFile()).split(os.extsep, 1)[0])
         if self.u.actionShow_Photo.isChecked():
@@ -193,21 +188,22 @@ class PlayerWindow(QMainWindow, Player):
                 self.currentmediaload = eyed3.load(self.currentmedia)
                 if self.currentmediaload and self.currentmediaload.tag and self.currentmediaload.tag.images:
                     img_data = self.currentmediaload.tag.images[0].image_data
-                    pixmap = QPixmap()
-                    if pixmap.loadFromData(img_data):
-                        scaled_pixmap = pixmap.scaled(self.u.label_4.size(),aspectRatioMode=1,transformMode=1)
-                        self.u.label_4.setPixmap(scaled_pixmap)
-                        self.u.label_4.show()
             elif self.currentmedia.endswith(".flac"):
                 self.currentmediaload = FLAC(self.currentmedia)
                 img_data = self.currentmediaload.pictures[0].data
-                pixmap = QPixmap()
-                if pixmap.loadFromData(img_data):
-                    scaled_pixmap = pixmap.scaled(self.u.label_4.size(),aspectRatioMode=1,transformMode=1)
-                    self.u.label_4.setPixmap(scaled_pixmap)
-                    self.u.label_4.show()
-            else:
-                self.u.label_4.hide()
+            elif self.currentmedia.endswith(".opus"):
+                cover_path = os.path.join(os.path.dirname(self.currentmedia), "cover_temp.jpg")
+                cmd = ["ffmpeg", "-y", "-i", self.currentmedia, "-an", "-vcodec", "copy", cover_path]
+                subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if os.path.isfile(cover_path):
+                    with open(cover_path, "rb") as f:
+                        img_data = f.read()
+                    os.remove(cover_path)
+            pixmap = QPixmap()
+            if pixmap.loadFromData(img_data):
+                scaled_pixmap = pixmap.scaled(self.u.label_4.size(),aspectRatioMode=1,transformMode=1)
+                self.u.label_4.setAlignment(Qt.AlignCenter)
+                self.u.label_4.setPixmap(scaled_pixmap)
     
     def repeatcheck(self):
         if self.u.checkBox_2.checkState() == Qt.Unchecked:
@@ -332,7 +328,7 @@ class PlayerWindow(QMainWindow, Player):
     def loadfolder(self, folder_path):
         self.playlist.clear()
         for filename in os.listdir(folder_path):
-            if filename.endswith(".mp3") or filename.endswith(".flac"):
+            if filename.endswith(".mp3") or filename.endswith(".flac") or filename.endswith(".opus"):
                 path = os.path.join(folder_path, filename)
                 self.playlist.addMedia(QMediaContent(QUrl.fromLocalFile(path)))
         if self.playlist.mediaCount() > 0:
