@@ -26,6 +26,7 @@ Install missing libraries using:
 ```bash
 pip install -r requirements.txt
 ```
+This app also needs **FFmpeg** for pulling .opus file cover art, please make sure you have it in your path.
 
 ## Files  
 - `player_ui.py` → UI logic created with Qt Designer.
